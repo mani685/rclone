@@ -536,6 +536,51 @@ func (vfs *VFS) OpenFile(path string) (fs.Object, error) {
 
 ---
 
+#### Cache Handling (VFS & DirCache)
+
+The VFS layer implements both an on-disk file cache and a directory cache to
+improve performance for listings and to support writeback semantics for
+non-seekable remotes. Key points:
+
+- Storage locations: the VFS cache root and metadata root are derived from
+  `config.GetCacheDir()` and the remote identity. The cache creates two
+  directories on disk: a data directory for cached file contents and a
+  metadata directory for item metadata. (See [vfs/vfscache/cache.go](vfs/vfscache/cache.go).)
+- Cache objects: the cache is exposed via a `Cache` type which tracks cached
+  `Item`s, space used, and provides `Stats()` and `Queue()` APIs for RC.
+  See [vfs/vfscache/cache.go](vfs/vfscache/cache.go) and
+  [vfs/vfscache/item.go](vfs/vfscache/item.go).
+- Mapping and fingerprinting: cached files are mapped to a stable OS path
+  representing the remote and object; metadata includes block maps and a
+  fingerprint so resumed uploads / writebacks can detect changes.
+  (See `objectFingerprint` and `toOSPath` in [vfs/vfscache/item.go](vfs/vfscache/item.go).)
+- Writeback and upload: dirty cache items are uploaded back to the remote
+  by the writeback subsystem. The writeback code coordinates multipart
+  uploads, retries, and state transitions. See
+  [vfs/vfscache/writeback/writeback.go](vfs/vfscache/writeback/writeback.go).
+- Cache cleaner and eviction: a background cleaner maintains the cache size
+  and removes stale or externally-deleted cache files. The cache exposes
+  synchronous reset semantics to recover from ENOSPC and other errors.
+  (See `Cache` methods in [vfs/vfscache/cache.go](vfs/vfscache/cache.go).)
+- Dir cache (directory listings): the VFS and several backends use a
+  directory cache to avoid repeated list calls. This can be configured by
+  `--dir-cache-time` and refreshed with polling. The `lib/dircache` helper
+  is used by backends that need directory ID mapping. See
+  [lib/dircache/dircache.go](lib/dircache/dircache.go) and
+  [vfs/vfs.md](vfs/vfs.md) for user-facing flags.
+- Pinning and lifecycle: VFS instances are pinned into an active cache so
+  the same VFS is reused for a given remote. See `cache.PinUntilFinalized`
+  and related logic in [vfs/vfs.go](vfs/vfs.go).
+
+Operational notes:
+
+- The cache stores both content and metadata; losing the metadata directory
+  can make cached blocks unrecognizable and force re-download or re-upload.
+- Use `--vfs-cache-mode` and `--dir-cache-time` to tune behavior for
+  large-scale transfers where listing and writeback behaviour matter.
+- The VFS cache integrates with rclone's RC endpoints so you can query
+  `vfs/cache/stats` and `vfs/cache/queue` operationally.
+
 ### 2.8 Backend-Specific: S3
 
 **Location**: `backend/s3/s3.go`
