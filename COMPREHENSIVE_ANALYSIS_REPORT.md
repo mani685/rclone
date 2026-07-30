@@ -1438,6 +1438,54 @@ rclone sync obs-source:bucket s3-dest:bucket \
 
 ## 10. REFERENCE ARCHITECTURE DIAGRAM
 
+### 10.1 High-Level Mermaid Architecture
+
+```mermaid
+flowchart LR
+    U[User / Automation / Shell Script] --> C[rclone CLI]
+    C --> CMD[Command layer<br/>cmd/*]
+    CMD --> SYNC[Sync / Copy / Move operations<br/>fs/sync]
+    CMD --> OPS[Generic file operations<br/>fs/operations]
+    SYNC --> MARCH[Directory walk<br/>fs/march]
+    SYNC --> FILTER[Filtering & config<br/>fs/filter + fs/config]
+    SYNC --> ACCT[Accounting & progress<br/>fs/accounting]
+    OPS --> P[Retry & pacing<br/>lib/pacer]
+    OPS --> REST[HTTP client wrapper<br/>lib/rest + fs/fshttp]
+    CMD --> REG[Backend registration<br/>backend/all + cmd/all]
+    REG --> BACK[Backend implementations<br/>backend/*]
+    BACK --> REMOTE[Cloud object storage<br/>S3 / OBS / Drive / Azure / Dropbox / etc.]
+    SYNC --> VFS[Virtual filesystem layer<br/>vfs]
+    VFS --> BACK
+```
+
+### 10.2 Low-Level Mermaid Architecture
+
+```mermaid
+flowchart TD
+    A[rclone.go] --> B[cmd.Main()]
+    B --> C[Command entry<br/>cmd/sync/sync.go]
+    C --> D[fs/sync.Sync()]
+    D --> E[Listing + comparison pipeline]
+    E --> F[fs/march walker]
+    E --> G[fs/filter + config]
+    D --> H[Checker pipeline]
+    D --> I[Transfer pipeline]
+    D --> J[Delete / rename pipeline]
+    H --> K[fs/operations.CheckHashes / Equal]
+    I --> L[fs/operations.Put / Copy / Move]
+    J --> M[fs/operations.Remove / Dir operations]
+    K --> N[Hash / metadata verification]
+    L --> O[Backend-specific implementation<br/>backend/s3, backend/drive, ...]
+    M --> O
+    O --> P[HTTP / multipart / server-side copy]
+    P --> Q[Remote object store]
+    D --> R[fs/accounting stats + progress]
+    D --> S[lib/pacer retry loop]
+    S --> O
+```
+
+### 10.3 Reference Architecture (ASCII)
+
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                    Rclone Petabyte-Scale Transfer               │
