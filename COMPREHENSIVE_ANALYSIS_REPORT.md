@@ -1458,7 +1458,7 @@ flowchart LR
     VFS --> BACK
 ```
 
-### 10.2 Low-Level Mermaid Architecture
+### 10.2.1 Low-Level Mermaid Architecture
 
 ```mermaid
 flowchart TD
@@ -1482,6 +1482,56 @@ flowchart TD
     D --> R["fs/accounting stats + progress"]
     D --> S["lib/pacer retry loop"]
     S --> O
+```
+### 10.2.2 Low-Level Mermaid Architecture Detail Diagram 
+
+```mermaid
+flowchart TD
+    Init["rclone.go (Main Entry)"] --> Cobra["cmd/sync/sync.go (CLI Handler)"]
+    Cobra --> SyncMain["fs/sync/sync.go (Sync Orchestrator)"]
+
+    subgraph P1 ["1. Listing & Checkers Pipeline (fs/march)"]
+        SyncMain --> March["march.Walk()"]
+        March --> Checkers["Goroutine Pool (--checkers)"]
+        Checkers --> SrcList["List OBS Objects"]
+        Checkers --> DstList["List S3 Objects"]
+        SrcList --> ChanSrc["srcChan (DirEntries)"]
+        DstList --> ChanDst["dstChan (DirEntries)"]
+    end
+
+    subgraph P2 ["2. Delta Comparison Pipeline (fs/sync)"]
+        ChanSrc --> Compare["sync.compareEntries()"]
+        ChanDst --> Compare
+        Compare --> Eval["Evaluate Size, ModTime, MD5"]
+        Eval --> QTransfer["Transfer Queue"]
+        Eval --> QDelete["Delete Queue"]
+        Eval --> QRename["Rename Queue"]
+    end
+
+    subgraph P3 ["3. Delete & Rename Pipeline (fs/operations)"]
+        QDelete --> OpsDel["operations.Remove()"]
+        QRename --> OpsMove["operations.Move()"]
+    end
+
+    subgraph P4 ["4. Transfer & Multipart Pipeline (fs/operations & backend/s3)"]
+        QTransfer --> OpsCopy["operations.Copy() (--transfers)"]
+        OpsCopy --> StreamOpen["OBS.Open() -> HTTP GET Stream"]
+        
+        StreamOpen --> AcctWrap["5. Accounting & Stats Wrapper"]
+        AcctWrap --> Buffer["RAM Ring Buffer (--buffer-size)"]
+        
+        Buffer --> S3Driver["s3.Put() -> MultipartEngine"]
+        S3Driver --> InitMulti["InitiateMultipartUpload"]
+        InitMulti --> Chunks["s3ChunkWriter.WriteChunk() (--s3-upload-concurrency)"]
+        Chunks --> CompleteMulti["CompleteMultipartUpload"]
+    end
+
+    subgraph P6 ["6. API Resilience (lib/pacer)"]
+        OpsDel --> Pacer["pacer.Call() (Exponential Backoff)"]
+        OpsMove --> Pacer
+        Chunks --> Pacer
+        Pacer --> Cloud["Target Cloud APIs"]
+    end
 ```
 
 ### 10.3 Reference Architecture (ASCII)
