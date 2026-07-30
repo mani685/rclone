@@ -1462,25 +1462,25 @@ flowchart LR
 
 ```mermaid
 flowchart TD
-    A[rclone.go] --> B[cmd.Main()]
-    B --> C[Command entry<br/>cmd/sync/sync.go]
-    C --> D[fs/sync.Sync()]
-    D --> E[Listing + comparison pipeline]
-    E --> F[fs/march walker]
-    E --> G[fs/filter + config]
-    D --> H[Checker pipeline]
-    D --> I[Transfer pipeline]
-    D --> J[Delete / rename pipeline]
-    H --> K[fs/operations.CheckHashes / Equal]
-    I --> L[fs/operations.Put / Copy / Move]
-    J --> M[fs/operations.Remove / Dir operations]
-    K --> N[Hash / metadata verification]
-    L --> O[Backend-specific implementation<br/>backend/s3, backend/drive, ...]
+    A["rclone.go"] --> B["cmd.Main()"]
+    B --> C["Command entry<br/>cmd/sync/sync.go"]
+    C --> D["fs/sync.Sync()"]
+    D --> E["Listing + comparison pipeline"]
+    E --> F["fs/march walker"]
+    E --> G["fs/filter + config"]
+    D --> H["Checker pipeline"]
+    D --> I["Transfer pipeline"]
+    D --> J["Delete / rename pipeline"]
+    H --> K["fs/operations.CheckHashes / Equal"]
+    I --> L["fs/operations.Put / Copy / Move"]
+    J --> M["fs/operations.Remove / Dir operations"]
+    K --> N["Hash / metadata verification"]
+    L --> O["Backend-specific implementation<br/>backend/s3, backend/drive, ..."]
     M --> O
-    O --> P[HTTP / multipart / server-side copy]
-    P --> Q[Remote object store]
-    D --> R[fs/accounting stats + progress]
-    D --> S[lib/pacer retry loop]
+    O --> P["HTTP / multipart / server-side copy"]
+    P --> Q["Remote object store"]
+    D --> R["fs/accounting stats + progress"]
+    D --> S["lib/pacer retry loop"]
     S --> O
 ```
 
